@@ -86,7 +86,8 @@ information content score:
 ```
 
 This is what would let a summary report say *what* a normalized node is, not just that it
-normalized. Ubergraph's alone is 384 MB.
+normalized. Ubergraph's alone is 384 MB; **5.7 GB across all 90 builds**, so mirroring these means
+restricting to the latest build per source (~31 files) rather than adding them to the sync filters.
 
 **`transform_{hash}/{source}_nodes.jsonl`** — the transform output, generated *before*
 normalization. This is the one that says what the upstream source knew about a CURIE we could
