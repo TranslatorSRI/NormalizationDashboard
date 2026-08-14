@@ -131,8 +131,32 @@ cross-source rollups.
   notebook, the Dash app and a future static-JSON exporter can all reuse it. `load_rows()` gives one
   row per (build, prefix); `summarize()` pools by (source, case-insensitive prefix).
 - `src/normalization_dashboard/app.py` — the Dash app. `uv run normalization-dashboard`.
-- `tests/test_loader.py` — invariant checks against the real mirror, no framework.
-  `uv run python tests/test_loader.py`. Skips cleanly if the mirror is not synced.
+- `src/normalization_dashboard/curie.py` — CURIE → URL, and malformed-CURIE detection.
+- `tests/test_loader.py`, `tests/test_curie.py` — invariant checks against the real mirror, no
+  framework. `uv run python tests/test_loader.py`. The loader one skips cleanly if the mirror is
+  not synced.
+
+### Linking CURIEs
+
+`biolink-model-prefix-map.json` is **vendored** into the package (266 prefixes, 14 KB) so the app
+works offline. Refresh it with:
+
+```bash
+curl -sL https://raw.githubusercontent.com/biolink/biolink-model/master/src/biolink_model/prefixmaps/biolink-model-prefix-map.json \
+     -o src/normalization_dashboard/biolink-model-prefix-map.json
+```
+
+The map covers 75.5% of the 898,042 distinct unnormalized CURIEs. The other 24 prefixes fall back to
+`https://bioregistry.io/{curie}`, which resolves them — including PathBank, which is not in the
+Biolink prefix map at all and is by itself 215,953 of those CURIEs. The `curies` package is not used:
+the Biolink file is a flat prefix → URI-stem dict, so expansion is one dict lookup and a string
+concat, and a case-insensitive index is a one-line comprehension.
+
+Malformed CURIEs get no link and a reason instead, because the malformation is often the whole
+explanation for the normalization failure. Real species found in the data: `rhea:RHEA:13065` (double
+prefix), `CL:0000089 ∩ UBERON:0000473` (post-composed class expression), `UniProtKB:B3DHD6 Q6XCC7`
+(two accessions in one CURIE), `UniProtKB:` (empty local id). Only 24 of 898,042 are malformed at
+this syntactic level — rare, but they cluster: intact's 2 RHEA failures are both double-prefixed.
 
 Current shape of the data through the loader: 587 raw rows, 31 sources, 84 case-insensitive
 prefixes, 242 summary rows (241 for latest builds only — historical builds add almost nothing at the

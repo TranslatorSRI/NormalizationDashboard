@@ -49,7 +49,14 @@ prefix at 0% of 3 CURIEs and one at 0% of 216,000 sort identically by percentage
 
 Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE prefixes case-insensitively
 (`ENSEMBL:`, `Ensembl:` and `ensembl:` all resolve alike); the spellings actually seen in the files
-are shown in the "Observed as" column.
+are shown in the "Observed as" column. Prefixes that fully normalize are hidden by default, and each
+version links back to the normalization output directory in KGX Storage that the numbers came from.
+
+**Click a row** to list the CURIEs that failed to normalize for that source and prefix. Each links
+out — via the Biolink prefix map, falling back to [Bioregistry](https://bioregistry.io/) — so you can
+check what the identifier actually is. CURIEs that are malformed are flagged with the reason instead
+of linked, since that is often the whole explanation for the failure (`rhea:RHEA:13065`,
+`CL:0000089 ∩ UBERON:0000473`, `UniProtKB:B3DHD6 Q6XCC7`).
 
 It runs locally, which keeps individual CURIEs off the public web and leaves the deployment question
 (GitHub Pages export, Kubernetes, or folding into another Translator dashboard) open.
