@@ -154,9 +154,6 @@ def summarize(rows):
                 "source_versions_md": ", ".join(
                     f"[{version}]({url})" for version, url in build_links.items()
                 ),
-                "failures_paths": sorted(
-                    {row["failures_path"] for row in group if row["failures_path"]}
-                ),
                 "builds": len({(r["source_version"], r["transform"]) for r in group}),
                 "prefix": prefix_key,
                 "observed_as": ", ".join(sorted({row["prefix"] for row in group})),

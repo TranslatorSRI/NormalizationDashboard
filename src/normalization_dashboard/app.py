@@ -1,5 +1,7 @@
 """Local Dash app: every data source x CURIE prefix, worst normalization first."""
 
+import os
+
 from dash import Dash, Input, Output, callback, dash_table, dcc, html
 
 from normalization_dashboard import curie
@@ -121,25 +123,44 @@ def update_table(latest_only, hide_complete):
     )
 
 
+def failures_paths(source, prefix, latest_only):
+    """The failures files behind one summary row.
+
+    Looked up here rather than carried in the table: DataTable cells may only
+    hold scalars, and the browser rejects the whole table if a row holds a list.
+    """
+    return sorted(
+        {
+            row["failures_path"]
+            for row in ROWS
+            if row["source"] == source
+            and row["prefix_key"] == prefix
+            and row["failures_path"]
+            and (row["is_latest"] or not latest_only)
+        }
+    )
+
+
 @callback(
     Output("failures", "children"),
     Input("table", "active_cell"),
     # The viewport, not `data`: active_cell.row indexes the sorted, filtered page.
     Input("table", "derived_viewport_data"),
+    Input("latest-only", "value"),
 )
-def show_failures(active_cell, data):
+def show_failures(active_cell, data, latest_only):
     """List the unnormalized CURIEs behind the clicked row.
 
     Read on demand rather than indexed up front: the biggest failures file is
     under 7 MB, and preloading all 87 of them would cost 3.2M lines for nothing.
     """
-    if not active_cell or active_cell["row"] >= len(data):
+    if not active_cell or not data or active_cell["row"] >= len(data):
         return None
     row = data[active_cell["row"]]
 
     prefix = row["prefix"]
     curies = []
-    for path in row["failures_paths"]:
+    for path in failures_paths(row["source"], prefix, "latest" in latest_only):
         with open(path) as failures:
             curies.extend(
                 line.strip()
@@ -177,4 +198,5 @@ def show_failures(active_cell, data):
 
 
 def main() -> None:
-    app.run(debug=True)
+    # PORT= lets a second instance run alongside one already on 8050.
+    app.run(debug=True, port=int(os.environ.get("PORT", 8050)))

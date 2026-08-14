@@ -42,6 +42,13 @@ def main():
     assert all(count == 1 for count in keys.values()), "summarize left duplicate (source, prefix)"
     assert all(row["prefix"] == row["prefix"].upper() for row in summary), "summary prefix not case-folded"
 
+    # Summary rows go straight into a DataTable, whose cells may only hold
+    # scalars -- a list or dict here makes the browser reject the whole table,
+    # which no server-side check would notice.
+    for row in summary:
+        for key, value in row.items():
+            assert isinstance(value, (str, int, float, bool)), f"{key} is {type(value).__name__}"
+
     latest_summary = summarize([row for row in rows if row["is_latest"]])
     print(
         f"OK: {len(rows)} rows over {len(per_source)} sources, "
