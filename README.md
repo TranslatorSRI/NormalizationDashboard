@@ -9,38 +9,24 @@ The NCATS Translator DINGO pipeline normalizes KGX node CURIEs through
 went: which prefixes normalized to what, and which CURIEs failed to normalize (so they can be
 prioritized for a future Babel ingest).
 
-## Syncing the normalization data
-
-Each KGX build directory contains `normalization-metadata.json`, `normalization_failures.txt`, and
-`normalization_map.json` alongside multi-gigabyte `normalized_nodes.jsonl` / `normalized_edges.jsonl`
-files. The sync script mirrors *only* the three normalization files, preserving KGX Storage's folder
-layout, and deletes local files that have disappeared upstream.
+## Quick start
 
 ```bash
-
-brew install rclone            # or apt install rclone
-./scripts/sync-kgx-normalization.sh
+brew install rclone                        # or apt install rclone
+uv sync
+./scripts/sync-kgx-normalization.sh        # ~970 MB into data/ (gitignored), a few minutes
+uv run normalization-dashboard             # http://127.0.0.1:8050
 ```
 
-That writes ~970 MB into `data/kgx-storage.ci.transltr.io/` (gitignored). Any extra arguments are
-passed through to `rclone`:
+The sync mirrors *only* the normalization files from each KGX build — the multi-gigabyte
+`normalized_nodes.jsonl` / `normalized_edges.jsonl` files are never fetched — preserving KGX
+Storage's folder layout and pruning anything that disappears upstream.
 
-```bash
-./scripts/sync-kgx-normalization.sh /tmp/kgxtest --dry-run
-./scripts/sync-kgx-normalization.sh data/kgx-storage.ci.transltr.io --exclude "**/normalization_map.json"
-```
+**[docs/Loading.md](docs/Loading.md)** has the full runbook: prerequisites, sync variants (including
+a ~56 MB mirror that skips the normalization maps), what lands where, how to keep it current,
+hosting, and troubleshooting.
 
-Skipping the maps with that last `--exclude` brings the mirror down to ~56 MB, which is enough for
-the prefix-summary and normalization-failure reports.
-
-**Known upstream issue:** ubergraph's 247 MB `normalization_map.json` returns 502 from KGX Storage
-and cannot be downloaded, so a full sync exits non-zero. See [CLAUDE.md](CLAUDE.md) for details.
-
-## Running the dashboard
-
-```bash
-uv run normalization-dashboard     # http://127.0.0.1:8050
-```
+## The dashboard
 
 A local [Dash](https://plotly.com/dash/) app. The first view is every data source × CURIE prefix,
 sorted from the worst normalization rate to the best — the ranking that says which prefixes Babel
@@ -48,9 +34,9 @@ should ingest next. Sort by **Failed** instead to rank by how many CURIEs are ac
 prefix at 0% of 3 CURIEs and one at 0% of 216,000 sort identically by percentage.
 
 Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE prefixes case-insensitively
-(`ENSEMBL:`, `Ensembl:` and `ensembl:` all resolve alike); the spellings actually seen in the files
-are shown in the "Observed as" column. Prefixes that fully normalize are hidden by default, and each
-version links back to the normalization output directory in KGX Storage that the numbers came from.
+(`ENSEMBL:`, `Ensembl:` and `ensembl:` all resolve alike). Prefixes that fully normalize are hidden
+by default, and each version links back to the normalization output directory in KGX Storage that
+the numbers came from.
 
 Each row carries up to five **Example** CURIEs that actually failed to normalize, spelled and cased
 as the source spells them — often the fastest explanation of a 0% row. PathBank's failures turn out
@@ -65,11 +51,17 @@ and 8,886 `PathBank:ProteinComplex_…`. Every CURIE links out — via the Bioli
 back to [Bioregistry](https://bioregistry.io/) — so you can check what the identifier actually is.
 
 It runs locally, which keeps individual CURIEs off the public web and leaves the deployment question
-(GitHub Pages export, Kubernetes, or folding into another Translator dashboard) open.
+(GitHub Pages export, Kubernetes, or folding into another Translator dashboard) open. `PORT=8051`
+runs a second instance alongside the first.
 
 ## Development
 
 ```bash
 uv sync
-uv run python tests/test_loader.py
+uv run python tests/test_loader.py     # invariants against the real mirror
+uv run python tests/test_curie.py      # CURIE linking, malformed detection, grouping
 ```
+
+`src/normalization_dashboard/loader.py` has no Dash imports and returns plain `list[dict]`, so a
+notebook or a future static-JSON exporter can reuse it without touching the app. See
+[CLAUDE.md](CLAUDE.md) for how KGX Storage behaves and what each file contains.
