@@ -15,9 +15,13 @@ Three goals, in order:
 3. Renormalize a build's normalization output against a new Babel release to estimate how much the
    new release would change the results.
 
-Planned shape: a Python CLI produces small static JSON summaries, committed to the repo and rendered
-by a plain HTML/JS page on GitHub Pages. Possibly ported to [Dash](https://plotly.com/dash/) later so
-it can be combined with other Translator dashboards.
+Current shape: a local [Dash](https://plotly.com/dash/) app over a local mirror of KGX Storage.
+Local is deliberate — individual unnormalized CURIEs stay off the public web while we work out what
+the dashboard should show, and Dash is the form that can later fold into other Translator
+dashboards. Nothing is hosted yet; see the Hosting section of [docs/Loading.md](docs/Loading.md).
+
+Goal 1 is built. Goals 2 and 3 are partly served by the click-through CURIE listing, and the
+normalization maps are mirrored ready for goal 3.
 
 ## KGX Storage
 
@@ -127,14 +131,54 @@ cross-source rollups.
 
 ## The app
 
+See [docs/Loading.md](docs/Loading.md) for the runbook. Layout:
+
 - `src/normalization_dashboard/loader.py` — no Dash imports, returns plain `list[dict]` so a
   notebook, the Dash app and a future static-JSON exporter can all reuse it. `load_rows()` gives one
-  row per (build, prefix); `summarize()` pools by (source, case-insensitive prefix).
-- `src/normalization_dashboard/app.py` — the Dash app. `uv run normalization-dashboard`.
-- `src/normalization_dashboard/curie.py` — CURIE → URL, and malformed-CURIE detection.
+  row per (build, prefix); `summarize()` pools by (source, case-insensitive prefix);
+  `load_failure_examples()` collects a few real failing CURIEs per (source, prefix);
+  `spread()` samples evenly across a list rather than taking its head.
+- `src/normalization_dashboard/app.py` — the Dash app. `uv run normalization-dashboard`, or
+  `PORT=8051` for a second instance.
+- `src/normalization_dashboard/curie.py` — CURIE → URL, malformed detection, and the `problem()` /
+  `stem()` grouping used by the click-through listing.
 - `tests/test_loader.py`, `tests/test_curie.py` — invariant checks against the real mirror, no
   framework. `uv run python tests/test_loader.py`. The loader one skips cleanly if the mirror is
   not synced.
+
+### Gotchas worth not rediscovering
+
+- **DataTable cells may only hold a string, number or boolean.** A list or dict on a row makes the
+  browser reject the *whole* table with `Invalid argument data[0].x passed into DataTable`. This is
+  a client-side propType check, so no server-side test and no `curl` of the callback endpoint will
+  ever see it — `test_loader.py` asserts every `summarize()` value is a scalar for exactly this
+  reason. More generally: verifying Dash callbacks over HTTP proves the data, never the rendering.
+- **`active_cell["row"]` indexes the sorted, filtered viewport**, not the `data` prop. Read
+  `derived_viewport_data`, or a click after re-sorting silently picks the wrong row.
+- **Row identity beats row index** for `style_data_conditional`: the selected-row highlight matches
+  on `{prefix}` and `{source}` via `filter_query` so it follows the row through a re-sort.
+- **The mirror path is resolved relative to the repo**, not the working directory, or an IDE run
+  configuration loads zero rows in silence.
+- **Table width was never a Dash limit.** A page container with `maxWidth` will silently crop the
+  table; `DataTable` fills whatever its parent gives it.
+
+### The click-through CURIE listing
+
+Unnormalized CURIEs are grouped by `curie.problem()`, most actionable first: `malformed: <reason>`,
+then `prefix unknown to the Biolink model`, then `no Babel clique for this identifier`. The prefix
+check is a *signal*, not a proven cause — Babel decides coverage for itself and does not consult the
+Biolink prefix map — so the label says what was actually checked.
+
+Within each problem, CURIEs are grouped by `curie.stem()`, everything up to the first digit. That is
+what turns pathbank's 215,953 failures into 175,039 `PathBank:Reaction_…`, 31,182
+`PathBank:Compound_…` and 8,886 `PathBank:ProteinComplex_…`, and splits bgee's ENSEMBL failures by
+species. Grouping declines above 12 groups and falls back to a flat list: InChIKeys contain no
+digits, so 87 of them would otherwise make 87 groups of one.
+
+Headline figures in the summary list describe the whole build selection, not the visible rows — an
+overall score that moved when you hid the fully-normalizing prefixes would be worse than useless.
+CURIEs are counted once per source, so the all-builds total of 3,225,939 failures counts occurrences
+(898,042 distinct).
 
 ### Linking CURIEs
 
@@ -164,11 +208,11 @@ prefixes, 242 summary rows (241 for latest builds only — historical builds add
 
 ## Local mirror
 
-`./scripts/sync-kgx-normalization.sh` mirrors those three file types into
-`data/kgx-storage.ci.transltr.io/`, named for the host it came from. Mirrors go in a directory named
-after the host they came from, so it stays obvious where a local copy originated. The nodes/edges
-files are excluded by the `--include` filters, which apply to the listing walk, so they are never
-fetched.
+`./scripts/sync-kgx-normalization.sh` mirrors those three file types plus `latest-build.json` into
+`data/kgx-storage.ci.transltr.io/` — a directory named after the host they came from, so it stays
+obvious where a local copy originated. The nodes/edges files are excluded by the `--include`
+filters, which apply to the listing walk, so they are never fetched. Full runbook, variants and
+troubleshooting: [docs/Loading.md](docs/Loading.md).
 
 `/data/` is gitignored, so use it as the scratch space for one-off jobs — intermediate results,
 downloaded samples, ad-hoc query output — rather than `/tmp`. It survives reboots and stays next to
@@ -176,7 +220,12 @@ the code, so a one-off job can be picked up or re-run later instead of being red
 
 ## Conventions
 
-- Add a dependency only when something actually needs it. The project has none so far.
+- Add a dependency only when something actually needs it. `dash` is the only one; `curies` was
+  considered and skipped because the Biolink prefix map is a flat dict.
 - The downloader stays `rclone` — it already does listing, filtering, incremental sync, pruning,
   retries, and concurrency.
 - Data files are never committed; only the small derived JSON summaries will be.
+- Derived values are recomputed rather than trusted: `success_rate` comes from the counts, not from
+  the field in the file.
+- PR titles become release notes, so they describe the change and its effect — never "WIP" or
+  "Initial implementation of X".
