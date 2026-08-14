@@ -82,8 +82,8 @@ def table_rows(latest_only, hide_complete):
 
 
 app.layout = html.Div(
-    # No maxWidth: the table wants every pixel the window has. Prose does not,
-    # so the paragraph below caps its own line length.
+    # No maxWidth anywhere: the table wants every pixel the window has, and the
+    # intro should line up with it rather than sit in a narrow column.
     style={"margin": "0 auto", "padding": "0 16px", "fontFamily": "system-ui, sans-serif"},
     children=[
         html.H1("Normalization by source and CURIE prefix"),
@@ -91,8 +91,8 @@ app.layout = html.Div(
             "Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE "
             "prefixes case-insensitively. Sort by Failed to rank by how many CURIEs are "
             "actually at stake rather than by percentage. Click a row to list the CURIEs "
-            "that failed to normalize.",
-            style={"maxWidth": "70ch"},
+            "that failed to normalize. CURIEs are counted once per source, so one that "
+            "appears in three sources counts three times.",
         ),
         dcc.Checklist(
             id="latest-only",
@@ -140,12 +140,34 @@ app.layout = html.Div(
 )
 def update_table(latest_only, hide_complete):
     latest_only = "latest" in latest_only
+    everything = table_rows(latest_only, False)
     data = table_rows(latest_only, "hide" in hide_complete)
-    complete = sum(1 for row in table_rows(latest_only, False) if row["success_rate"] == 100)
+    complete = sum(1 for row in everything if row["success_rate"] == 100)
     return (
         data,
-        f"{len(data)} rows across {len({row['source'] for row in data})} sources",
+        summary_line(data, everything),
         [{"label": f" Hide prefixes that fully normalize (n={complete})", "value": "hide"}],
+    )
+
+
+def summary_line(shown, everything):
+    """Totals for the whole build selection, not just the visible rows.
+
+    Hiding the fully-normalizing prefixes must not make the overall score look
+    worse than it is, so every figure but the row count describes `everything`.
+    """
+    total = sum(row["total"] for row in everything)
+    succeeded = sum(row["succeeded"] for row in everything)
+    rows = (
+        f"{len(shown):,} rows"
+        if len(shown) == len(everything)
+        else f"Showing {len(shown):,} of {len(everything):,} rows"
+    )
+    return (
+        f"{rows} — {len({row['source'] for row in everything})} sources, "
+        f"{len({row['prefix'] for row in everything})} CURIE prefixes, "
+        f"{succeeded:,} of {total:,} CURIEs normalized "
+        f"({100 * succeeded / total:.1f}%), {total - succeeded:,} failed"
     )
 
 
