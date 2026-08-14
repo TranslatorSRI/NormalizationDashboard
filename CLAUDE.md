@@ -141,9 +141,14 @@ prefixes, 242 summary rows (241 for latest builds only — historical builds add
 ## Local mirror
 
 `./scripts/sync-kgx-normalization.sh` mirrors those three file types into
-`data/kgx-storage.ci.transltr.io/`, named for the host it came from. `/data/` is gitignored as
-scratch space. The nodes/edges files are excluded by the `--include` filters, which apply to the
-listing walk, so they are never fetched.
+`data/kgx-storage.ci.transltr.io/`, named for the host it came from. Mirrors go in a directory named
+after the host they came from, so it stays obvious where a local copy originated. The nodes/edges
+files are excluded by the `--include` filters, which apply to the listing walk, so they are never
+fetched.
+
+`/data/` is gitignored, so use it as the scratch space for one-off jobs — intermediate results,
+downloaded samples, ad-hoc query output — rather than `/tmp`. It survives reboots and stays next to
+the code, so a one-off job can be picked up or re-run later instead of being redone from scratch.
 
 ## Conventions
 
