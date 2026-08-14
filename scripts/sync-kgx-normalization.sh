@@ -16,4 +16,5 @@ rclone sync --http-url https://kgx-storage.ci.transltr.io :http:data/ "$DEST" \
   --include "**/normalization-metadata.json" \
   --include "**/normalization_failures.txt" \
   --include "**/normalization_map.json" \
+  --include "**/latest-build.json" \
   --checkers 16 --transfers 8 --progress --stats-one-line "${@:2}"
