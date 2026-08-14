@@ -22,7 +22,10 @@ COLUMNS = [
     ("failed", "Failed", False),
     ("success_rate", "Success %", False),
     *[(f"example_{n}", f"Example {n}", True) for n in range(1, EXAMPLE_COUNT + 1)],
-    ("normalized_to_str", "Normalized to", False),
+    # No "Normalized to" column: at 200+ characters for semmeddb it was the one
+    # value wide enough to force a scrollbar by itself, and where a prefix
+    # normalizes *to* is a renormalization-diff question, not a today question.
+    # summarize() still carries normalized_to_str for when that work starts.
 ]
 
 # Red at 0% shading to green at 100%, so the ranking is scannable without reading numbers.
@@ -72,14 +75,17 @@ def table_rows(latest_only, hide_complete):
 
 
 app.layout = html.Div(
-    style={"maxWidth": "1400px", "margin": "0 auto", "fontFamily": "system-ui, sans-serif"},
+    # No maxWidth: the table wants every pixel the window has. Prose does not,
+    # so the paragraph below caps its own line length.
+    style={"margin": "0 auto", "padding": "0 16px", "fontFamily": "system-ui, sans-serif"},
     children=[
         html.H1("Normalization by source and CURIE prefix"),
         html.P(
             "Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE "
             "prefixes case-insensitively. Sort by Failed to rank by how many CURIEs are "
             "actually at stake rather than by percentage. Click a row to list the CURIEs "
-            "that failed to normalize."
+            "that failed to normalize.",
+            style={"maxWidth": "70ch"},
         ),
         dcc.Checklist(
             id="latest-only",
@@ -95,7 +101,7 @@ app.layout = html.Div(
                 for key, name, md in COLUMNS
             ],
             markdown_options={"link_target": "_blank"},
-            # 14 columns: let the table scroll rather than crush every cell.
+            # Safety net for narrow windows: scroll the table, never the page.
             style_table={"overflowX": "auto"},
             sort_action="native",
             filter_action="native",
