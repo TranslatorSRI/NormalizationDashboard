@@ -51,6 +51,34 @@ def url(curie):
     return uri_stem + local_id if uri_stem else BIOREGISTRY_URL.format(curie)
 
 
+MALFORMED = "malformed"
+UNKNOWN_PREFIX = "prefix unknown to the Biolink model"
+NO_CLIQUE = "no Babel clique for this identifier"
+
+# Most actionable first: a malformed CURIE is a transform bug we can point at, an
+# unknown prefix is a modelling gap, and the rest is ordinary Babel coverage.
+PROBLEM_ORDER = {MALFORMED: 0, UNKNOWN_PREFIX: 1, NO_CLIQUE: 2}
+
+
+def problem(curie):
+    """Why this CURIE plausibly failed to normalize.
+
+    The prefix check is a signal, not a proven cause -- Babel decides coverage
+    for itself, not from the Biolink prefix map -- but a prefix the model has
+    never heard of is rarely a coincidence when its CURIEs all fail.
+    """
+    reason = malformed(curie)
+    if reason:
+        return f"{MALFORMED}: {reason}"
+    if curie.partition(":")[0].upper() not in PREFIX_MAP:
+        return UNKNOWN_PREFIX
+    return NO_CLIQUE
+
+
+def problem_rank(label):
+    return PROBLEM_ORDER.get(label.split(": ")[0], len(PROBLEM_ORDER))
+
+
 def stem(curie):
     """The shape of a CURIE: everything up to its first digit.
 

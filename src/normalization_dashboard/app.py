@@ -1,6 +1,7 @@
 """Local Dash app: every data source x CURIE prefix, worst normalization first."""
 
 import os
+from collections import defaultdict
 
 from dash import Dash, Input, Output, callback, dash_table, dcc, html
 
@@ -59,7 +60,7 @@ PREFIX_STYLE = {
 ACTIVE_CELL_STYLE = {"if": {"state": "active"}, "backgroundColor": "transparent"}
 SELECTED_ROW_COLOUR = "#dbe6ff"
 
-MAX_CURIES_SHOWN = 200
+MAX_CURIES_SHOWN = 30
 EXAMPLES_PER_GROUP = 6
 
 app = Dash(__name__)
@@ -227,52 +228,68 @@ def show_failures(active_cell, data, latest_only):
             style={"color": "#555"},
         )
 
-    malformed = [c for c in curies if curie.malformed(c)]
-    groups = curie.group_by_stem(curies)
+    by_problem = defaultdict(list)
+    for value in curies:
+        by_problem[curie.problem(value)].append(value)
+    ordered = sorted(
+        by_problem.items(), key=lambda item: (curie.problem_rank(item[0]), -len(item[1]))
+    )
     return [
         html.H2(
             f"{len(curies):,} unnormalized {prefix} CURIEs in {row['source']}",
             style={"fontSize": "1.2em"},
         ),
-        html.P(
-            f"{len(malformed):,} of these are malformed, which may be the whole explanation.",
-            style={"color": "#a33"},
-        )
-        if malformed
-        else None,
         html.Ul(
-            [_group_item(shape, count, members) for shape, count, members in groups]
-            if groups
-            else [_curie_item(c) for c in loader.spread(curies, MAX_CURIES_SHOWN)],
+            [_problem_item(label, members) for label, members in ordered],
             style={"lineHeight": "1.8"},
         ),
     ]
 
 
-def _group_item(shape, count, members):
-    """One shape of CURIE, with a few members spread across the whole group."""
+def _problem_item(label, members):
+    """One reason these CURIEs failed, broken down by CURIE shape underneath.
+
+    A single shape is rendered inline: nesting one bullet under another says
+    nothing.
+    """
+    heading = html.Strong(
+        f"{len(members):,} — {label}",
+        style={"color": "#a33"} if label.startswith(curie.MALFORMED) else None,
+    )
+    shapes = curie.group_by_stem(members)
+    if shapes and len(shapes) > 1:
+        return html.Li([heading, html.Ul([_shape_item(*shape) for shape in shapes])])
+    if shapes:
+        return html.Li([heading, " ", _examples(members)])
+    # No shared shape to group on, so just list them, spread across the whole set.
+    listed = loader.spread(members, MAX_CURIES_SHOWN)
+    note = (
+        f" (showing {len(listed)} spread across {len(members):,})"
+        if len(listed) < len(members)
+        else ""
+    )
     return html.Li(
         [
-            html.Strong(f"{count:,} × {shape}…  "),
-            dcc.Markdown(
-                " · ".join(
-                    curie.as_markdown(c, explain=True)
-                    for c in loader.spread(members, EXAMPLES_PER_GROUP)
-                ),
-                link_target="_blank",
-                style={"display": "inline"},
-            ),
+            heading,
+            note,
+            html.Ul([html.Li(_examples([value], 1)) for value in listed]),
         ]
     )
 
 
-def _curie_item(value):
-    return html.Li(
-        dcc.Markdown(
-            curie.as_markdown(value, explain=True),
-            link_target="_blank",
-            style={"display": "inline"},
-        )
+def _shape_item(shape, count, members):
+    return html.Li([html.Strong(f"{count:,} × {shape}…  "), _examples(members)])
+
+
+def _examples(members, limit=EXAMPLES_PER_GROUP):
+    """A few members spread across the whole group, linked."""
+    return dcc.Markdown(
+        " · ".join(
+            curie.as_markdown(value, explain=True)
+            for value in loader.spread(members, limit)
+        ),
+        link_target="_blank",
+        style={"display": "inline"},
     )
 
 

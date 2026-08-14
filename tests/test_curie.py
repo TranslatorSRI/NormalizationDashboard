@@ -42,6 +42,16 @@ def main():
     # Linked, and monospaced so the exact characters of a CURIE are visible.
     assert curie.as_markdown("MONDO:0001034").startswith("[`MONDO:0001034`](")
 
+    # Grouping by problem, most actionable first.
+    assert curie.problem("rhea:RHEA:13065") == "malformed: more than one ':'"
+    assert curie.problem("PathBank:SMP0000055") == curie.UNKNOWN_PREFIX
+    assert curie.problem("MONDO:0001034") == curie.NO_CLIQUE
+    assert (
+        curie.problem_rank(curie.problem("rhea:RHEA:13065"))
+        < curie.problem_rank(curie.UNKNOWN_PREFIX)
+        < curie.problem_rank(curie.NO_CLIQUE)
+    )
+
     # Grouping on CURIE shape: everything up to the first digit.
     assert curie.stem("PathBank:Reaction_13124") == "PathBank:Reaction_"
     assert curie.stem("Ensembl:ENSRNOG00000019082") == "Ensembl:ENSRNOG"

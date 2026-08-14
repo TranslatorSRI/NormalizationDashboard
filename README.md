@@ -56,11 +56,13 @@ Each row carries up to five **Example** CURIEs that actually failed to normalize
 as the source spells them — often the fastest explanation of a 0% row. PathBank's failures turn out
 to be `PathBank:Reaction_13124` and `PathBank:Compound_102409`, not pathway identifiers at all.
 
-**Click a row** to list the CURIEs that failed to normalize for that source and prefix. Each links
-out — via the Biolink prefix map, falling back to [Bioregistry](https://bioregistry.io/) — so you can
-check what the identifier actually is. CURIEs that are malformed are flagged with the reason instead
-of linked, since that is often the whole explanation for the failure (`rhea:RHEA:13065`,
-`CL:0000089 ∩ UBERON:0000473`, `UniProtKB:B3DHD6 Q6XCC7`).
+**Click a row** to list the CURIEs that failed to normalize for that source and prefix, grouped by
+*why* they plausibly failed — malformed first (`rhea:RHEA:13065`, `CL:0000089 ∩ UBERON:0000473`,
+`UniProtKB:B3DHD6 Q6XCC7`), then prefixes the Biolink model has never heard of, then the ordinary
+"no Babel clique" remainder. Within each reason they are broken down by CURIE shape, which is how
+pathbank's 215,953 failures resolve into 175,039 `PathBank:Reaction_…`, 31,182 `PathBank:Compound_…`
+and 8,886 `PathBank:ProteinComplex_…`. Every CURIE links out — via the Biolink prefix map, falling
+back to [Bioregistry](https://bioregistry.io/) — so you can check what the identifier actually is.
 
 It runs locally, which keeps individual CURIEs off the public web and leaves the deployment question
 (GitHub Pages export, Kubernetes, or folding into another Translator dashboard) open.
