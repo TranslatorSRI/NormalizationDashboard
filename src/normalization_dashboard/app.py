@@ -14,7 +14,9 @@ COLUMNS = [
     ("prefix", "CURIE Prefix", False),
     ("source", "Source", False),
     ("source_versions_md", "Version", True),
-    ("observed_as", "Observed as", False),
+    # No "Observed as" column: it equals the prefix in every row today, and the
+    # Example columns show the original casing anyway. summarize() still carries
+    # the field for whenever one source does spell a prefix two ways.
     ("total", "Total", False),
     ("succeeded", "Succeeded", False),
     ("failed", "Failed", False),

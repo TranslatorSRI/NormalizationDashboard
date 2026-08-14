@@ -43,30 +43,45 @@ def _normalized_to_str(normalized_to):
     )
 
 
+def _spread(values, limit):
+    """`limit` values spaced evenly across the list, not just its head.
+
+    A prefix's failures are usually grouped in file order, so the first few are
+    often all alike; a spread shows whether the rest of them differ.
+    """
+    if len(values) <= limit:
+        return list(values)
+    step = len(values) / limit
+    return [values[int(index * step)] for index in range(limit)]
+
+
 def load_failure_examples(rows, limit=5):
     """A few real unnormalized CURIEs per (source, uppercased prefix).
 
     One pass per failures file rather than per row -- 87 files, 3.2M lines, under
-    a second. CURIEs keep the case the file spells them with, which is half the
-    point: seeing `Ensembl:ENSRNOG…` or `PathBank:Reaction_13124` says more about
-    why a prefix fails than the folded prefix name does.
+    a second, holding only one file's CURIEs at a time. CURIEs keep the case the
+    file spells them with, which is half the point: seeing `Ensembl:ENSRNOG…` or
+    `PathBank:Reaction_13124` says more about why a prefix fails than the folded
+    prefix name does.
     """
     paths = {}
     for row in rows:
         if row["failures_path"]:
             paths.setdefault(row["failures_path"], (row["source"], row["is_latest"]))
 
-    examples = defaultdict(list)
-    # Latest builds first, so examples come from current data where there is any.
+    examples = {}
+    # Latest builds first, so a source's examples come from its current build.
     for path, (source, _) in sorted(paths.items(), key=lambda item: not item[1][1]):
+        by_prefix = defaultdict(list)
         with open(path) as failures:
             for line in failures:
                 curie = line.strip()
-                if not curie:
-                    continue
-                found = examples[(source, curie.split(":")[0].upper())]
-                if len(found) < limit and curie not in found:
-                    found.append(curie)
+                if curie:
+                    by_prefix[curie.split(":")[0].upper()].append(curie)
+        for prefix, curies in by_prefix.items():
+            examples.setdefault(
+                (source, prefix), _spread(list(dict.fromkeys(curies)), limit)
+            )
     return examples
 
 
