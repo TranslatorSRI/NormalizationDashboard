@@ -10,6 +10,10 @@ from pathlib import Path
 
 DEFAULT_MIRROR = Path("data/kgx-storage.ci.transltr.io")
 
+# The mirror directory is named after the host, so the remote URL of any mirrored
+# file is the host plus its path under the mirror root.
+KGX_STORAGE_URL = "https://kgx-storage.ci.transltr.io/data"
+
 
 def _normalized_to_str(normalized_to):
     """'NCBIGene 91678; UniProtKB 82176; PR 79548', biggest target first."""
@@ -42,6 +46,9 @@ def load_rows(mirror=DEFAULT_MIRROR):
                     "transform": transform.removeprefix("transform_"),
                     "normalization": normalization.removeprefix("normalization_"),
                     "babel_version": metadata.get("babel_version"),
+                    "build_url": "/".join(
+                        (KGX_STORAGE_URL, source, source_version, transform, normalization, "")
+                    ),
                     "prefix": prefix,
                     "prefix_key": prefix.upper(),
                     "total": stats["total"],
@@ -113,11 +120,21 @@ def summarize(rows):
         for row in group:
             for target, count in row["normalized_to"].items():
                 normalized_to[target.upper()] += count
+        # One link per build the row pools, pointing at the normalization output
+        # directory these numbers came from.
+        build_links = {
+            row["source_version"]: row["build_url"]
+            for row in sorted(group, key=lambda row: row["source_version"])
+        }
         summary.append(
             {
                 "source": source,
-                "source_versions": ", ".join(
-                    sorted({row["source_version"] for row in group})
+                "source_versions": ", ".join(build_links),
+                "source_versions_md": ", ".join(
+                    f"[{version}]({url})" for version, url in build_links.items()
+                ),
+                "failures_paths": sorted(
+                    {row["failures_path"] for row in group if row["failures_path"]}
                 ),
                 "builds": len({(r["source_version"], r["transform"]) for r in group}),
                 "prefix": prefix_key,
