@@ -7,6 +7,8 @@ Telling those apart is the point of this module.
 """
 
 import json
+import re
+from collections import Counter
 from pathlib import Path
 
 # Vendored from biolink-model so the app works offline; 266 prefixes, refresh with:
@@ -47,6 +49,41 @@ def url(curie):
     prefix, _, local_id = curie.partition(":")
     uri_stem = PREFIX_MAP.get(prefix.upper())
     return uri_stem + local_id if uri_stem else BIOREGISTRY_URL.format(curie)
+
+
+def stem(curie):
+    """The shape of a CURIE: everything up to its first digit.
+
+    `PathBank:Reaction_13124` -> `PathBank:Reaction_`, `Ensembl:ENSRNOG00000019082`
+    -> `Ensembl:ENSRNOG`. Grouping on this splits pathbank's failures into
+    Reaction_, Compound_ and ProteinComplex_, and bgee's into one group per
+    species, which says far more than a flat list of 215,953 identifiers.
+    """
+    prefix, _, local_id = curie.partition(":")
+    return prefix + ":" + re.match(r"[^0-9]*", local_id).group(0)
+
+
+# Above this many groups, the stem is not finding real structure -- InChIKeys
+# have no digits to split on, so 87 of them make 87 groups of one.
+MAX_USEFUL_GROUPS = 12
+
+
+def group_by_stem(curies):
+    """[(stem, count, [curies in that group])], biggest group first.
+
+    Returns None when grouping would not be informative, so the caller can fall
+    back to a plain list.
+    """
+    counts = Counter(stem(curie) for curie in curies)
+    if len(counts) > MAX_USEFUL_GROUPS:
+        return None
+    grouped = {}
+    for curie in curies:
+        grouped.setdefault(stem(curie), []).append(curie)
+    return [
+        (shape, counts[shape], grouped[shape])
+        for shape, _ in counts.most_common()
+    ]
 
 
 def as_markdown(curie, explain=False):

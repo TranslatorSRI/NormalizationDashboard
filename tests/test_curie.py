@@ -42,6 +42,24 @@ def main():
     # Linked, and monospaced so the exact characters of a CURIE are visible.
     assert curie.as_markdown("MONDO:0001034").startswith("[`MONDO:0001034`](")
 
+    # Grouping on CURIE shape: everything up to the first digit.
+    assert curie.stem("PathBank:Reaction_13124") == "PathBank:Reaction_"
+    assert curie.stem("Ensembl:ENSRNOG00000019082") == "Ensembl:ENSRNOG"
+    assert curie.stem("FOODON:02021990") == "FOODON:"
+
+    groups = curie.group_by_stem(
+        ["PathBank:Reaction_1", "PathBank:Reaction_2", "PathBank:Compound_9"]
+    )
+    assert [(shape, count) for shape, count, _ in groups] == [
+        ("PathBank:Reaction_", 2),
+        ("PathBank:Compound_", 1),
+    ], groups
+
+    # InChIKeys have no digits to split on, so every one becomes its own group.
+    # Grouping declines rather than printing a list of groups of one.
+    inchikeys = [f"INCHIKEY:{chr(65 + n)}FOFVIBWSLOHFR-QDMKHBRRSA-N" for n in range(20)]
+    assert curie.group_by_stem(inchikeys) is None
+
     print(f"OK: {len(curie.PREFIX_MAP)} Biolink prefixes loaded")
     return 0
 

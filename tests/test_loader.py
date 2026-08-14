@@ -10,10 +10,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from normalization_dashboard.loader import DEFAULT_MIRROR, load_rows, summarize
+from normalization_dashboard.loader import DEFAULT_MIRROR, load_rows, spread, summarize
 
 
 def main():
+    # Examples are spread across a list, not taken from its head.
+    assert spread(list(range(10)), 5) == [0, 2, 4, 6, 8]
+    assert spread(["a", "b"], 5) == ["a", "b"]
+    assert spread([], 5) == []
+
     if not DEFAULT_MIRROR.exists():
         print(f"SKIP: no mirror at {DEFAULT_MIRROR}; run scripts/sync-kgx-normalization.sh")
         return 0

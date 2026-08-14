@@ -43,7 +43,7 @@ def _normalized_to_str(normalized_to):
     )
 
 
-def _spread(values, limit):
+def spread(values, limit):
     """`limit` values spaced evenly across the list, not just its head.
 
     A prefix's failures are usually grouped in file order, so the first few are
@@ -80,7 +80,7 @@ def load_failure_examples(rows, limit=5):
                     by_prefix[curie.split(":")[0].upper()].append(curie)
         for prefix, curies in by_prefix.items():
             examples.setdefault(
-                (source, prefix), _spread(list(dict.fromkeys(curies)), limit)
+                (source, prefix), spread(list(dict.fromkeys(curies)), limit)
             )
     return examples
 

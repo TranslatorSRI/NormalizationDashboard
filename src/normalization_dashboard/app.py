@@ -4,7 +4,7 @@ import os
 
 from dash import Dash, Input, Output, callback, dash_table, dcc, html
 
-from normalization_dashboard import curie
+from normalization_dashboard import curie, loader
 from normalization_dashboard.loader import load_failure_examples, load_rows, summarize
 
 EXAMPLE_COUNT = 5
@@ -54,7 +54,13 @@ PREFIX_STYLE = {
     "backgroundColor": "#f4f4f6",
 }
 
-MAX_CURIES_SHOWN = 300
+# Clicking anywhere in a row highlights the whole row; the single active cell
+# gets no colour of its own, since which cell you happened to hit means nothing.
+ACTIVE_CELL_STYLE = {"if": {"state": "active"}, "backgroundColor": "transparent"}
+SELECTED_ROW_COLOUR = "#dbe6ff"
+
+MAX_CURIES_SHOWN = 200
+EXAMPLES_PER_GROUP = 6
 
 app = Dash(__name__)
 ROWS = load_rows()
@@ -116,7 +122,7 @@ app.layout = html.Div(
                 {"if": {"column_id": column}, "textAlign": "right"}
                 for column in ("total", "succeeded", "failed", "success_rate")
             ],
-            style_data_conditional=[PREFIX_STYLE, *RATE_SHADING],
+            style_data_conditional=[PREFIX_STYLE, *RATE_SHADING, ACTIVE_CELL_STYLE],
             style_header={"fontWeight": "600"},
         ),
         html.Div(id="failures", style={"marginTop": "24px"}),
@@ -161,6 +167,32 @@ def failures_paths(source, prefix, latest_only):
 
 
 @callback(
+    Output("table", "style_data_conditional"),
+    Input("table", "active_cell"),
+    Input("table", "derived_viewport_data"),
+)
+def highlight_selected_row(active_cell, data):
+    """Colour the whole clicked row, matched on identity rather than position.
+
+    A row index would follow the viewport rather than the row once the table is
+    re-sorted or filtered.
+    """
+    styles = [PREFIX_STYLE, *RATE_SHADING, ACTIVE_CELL_STYLE]
+    if active_cell and data and active_cell["row"] < len(data):
+        row = data[active_cell["row"]]
+        styles.append(
+            {
+                "if": {
+                    "filter_query": f'{{prefix}} = "{row["prefix"]}" '
+                    f'&& {{source}} = "{row["source"]}"'
+                },
+                "backgroundColor": SELECTED_ROW_COLOUR,
+            }
+        )
+    return styles
+
+
+@callback(
     Output("failures", "children"),
     Input("table", "active_cell"),
     # The viewport, not `data`: active_cell.row indexes the sorted, filtered page.
@@ -195,25 +227,53 @@ def show_failures(active_cell, data, latest_only):
             style={"color": "#555"},
         )
 
-    shown = curies[:MAX_CURIES_SHOWN]
-    malformed = [c for c in shown if curie.malformed(c)]
-    heading = f"{len(curies):,} unnormalized {prefix} CURIEs in {row['source']}"
-    if len(shown) < len(curies):
-        heading += f" (showing the first {len(shown):,})"
+    malformed = [c for c in curies if curie.malformed(c)]
+    groups = curie.group_by_stem(curies)
     return [
-        html.H2(heading, style={"fontSize": "1.2em"}),
+        html.H2(
+            f"{len(curies):,} unnormalized {prefix} CURIEs in {row['source']}",
+            style={"fontSize": "1.2em"},
+        ),
         html.P(
-            f"{len(malformed)} of these are malformed, which may be the whole explanation.",
+            f"{len(malformed):,} of these are malformed, which may be the whole explanation.",
             style={"color": "#a33"},
         )
         if malformed
         else None,
-        dcc.Markdown(
-            " · ".join(curie.as_markdown(c, explain=True) for c in shown),
-            link_target="_blank",
-            style={"lineHeight": "2"},
+        html.Ul(
+            [_group_item(shape, count, members) for shape, count, members in groups]
+            if groups
+            else [_curie_item(c) for c in loader.spread(curies, MAX_CURIES_SHOWN)],
+            style={"lineHeight": "1.8"},
         ),
     ]
+
+
+def _group_item(shape, count, members):
+    """One shape of CURIE, with a few members spread across the whole group."""
+    return html.Li(
+        [
+            html.Strong(f"{count:,} × {shape}…  "),
+            dcc.Markdown(
+                " · ".join(
+                    curie.as_markdown(c, explain=True)
+                    for c in loader.spread(members, EXAMPLES_PER_GROUP)
+                ),
+                link_target="_blank",
+                style={"display": "inline"},
+            ),
+        ]
+    )
+
+
+def _curie_item(value):
+    return html.Li(
+        dcc.Markdown(
+            curie.as_markdown(value, explain=True),
+            link_target="_blank",
+            style={"display": "inline"},
+        )
+    )
 
 
 def main() -> None:
