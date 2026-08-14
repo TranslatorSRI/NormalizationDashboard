@@ -87,20 +87,14 @@ app.layout = html.Div(
     style={"margin": "0 auto", "padding": "0 16px", "fontFamily": "system-ui, sans-serif"},
     children=[
         html.H1("Normalization by source and CURIE prefix"),
-        html.P(
-            "Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE "
-            "prefixes case-insensitively. Sort by Failed to rank by how many CURIEs are "
-            "actually at stake rather than by percentage. Click a row to list the CURIEs "
-            "that failed to normalize. CURIEs are counted once per source, so one that "
-            "appears in three sources counts three times.",
-        ),
+        html.Ul(id="summary", style={"lineHeight": "1.7"}),
         dcc.Checklist(
             id="latest-only",
             options=[{"label": " Latest build per source only", "value": "latest"}],
             value=["latest"],
         ),
         dcc.Checklist(id="hide-complete", options=[], value=["hide"]),
-        html.Div(id="row-count", style={"margin": "8px 0", "color": "#555"}),
+        html.Div(id="row-count", style={"margin": "8px 0"}),
         dash_table.DataTable(
             id="table",
             columns=[
@@ -131,8 +125,22 @@ app.layout = html.Div(
 )
 
 
+# Fixed notes, listed after the figures so the numbers come first.
+NOTES = [
+    "Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE "
+    "prefixes case-insensitively.",
+    "Sort by Failed to rank by how many CURIEs are at stake rather than by "
+    "percentage: 0% of 3 and 0% of 215,953 rank identically by rate.",
+    "Click a row to list the CURIEs that failed to normalize, grouped by why "
+    "they plausibly failed.",
+    "CURIEs are counted once per source, so one appearing in three sources "
+    "counts three times.",
+]
+
+
 @callback(
     Output("table", "data"),
+    Output("summary", "children"),
     Output("row-count", "children"),
     Output("hide-complete", "options"),
     Input("latest-only", "value"),
@@ -145,30 +153,32 @@ def update_table(latest_only, hide_complete):
     complete = sum(1 for row in everything if row["success_rate"] == 100)
     return (
         data,
-        summary_line(data, everything),
+        summary_items(everything),
+        f"{len(data):,} rows displayed",
         [{"label": f" Hide prefixes that fully normalize (n={complete})", "value": "hide"}],
     )
 
 
-def summary_line(shown, everything):
-    """Totals for the whole build selection, not just the visible rows.
+def summary_items(everything):
+    """The headline figures, then the fixed notes, as one scannable list.
 
-    Hiding the fully-normalizing prefixes must not make the overall score look
-    worse than it is, so every figure but the row count describes `everything`.
+    These describe the whole build selection rather than the visible rows: an
+    overall score that moved when you hid the fully-normalizing prefixes would
+    be worse than useless.
     """
     total = sum(row["total"] for row in everything)
     succeeded = sum(row["succeeded"] for row in everything)
-    rows = (
-        f"{len(shown):,} rows"
-        if len(shown) == len(everything)
-        else f"Showing {len(shown):,} of {len(everything):,} rows"
-    )
-    return (
-        f"{rows} — {len({row['source'] for row in everything})} sources, "
-        f"{len({row['prefix'] for row in everything})} CURIE prefixes, "
+    figures = [
         f"{succeeded:,} of {total:,} CURIEs normalized "
-        f"({100 * succeeded / total:.1f}%), {total - succeeded:,} failed"
-    )
+        f"({100 * succeeded / total:.1f}%)",
+        f"{total - succeeded:,} CURIEs failed to normalize",
+        f"{len({row['source'] for row in everything})} sources, "
+        f"{len({row['prefix'] for row in everything})} CURIE prefixes, "
+        f"{len(everything):,} source/prefix pairs",
+    ]
+    return [html.Li(html.Strong(figure)) for figure in figures] + [
+        html.Li(note) for note in NOTES
+    ]
 
 
 def failures_paths(source, prefix, latest_only):
