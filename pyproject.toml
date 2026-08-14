@@ -1,0 +1,19 @@
+[project]
+name = "normalization-dashboard"
+version = "0.1.0"
+description = "A dashboard to track normalization across KGX releases"
+readme = "README.md"
+authors = [
+    { name = "Gaurav Vaidya", email = "gaurav@renci.org" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "dash>=4.4.1",
+]
+
+[project.scripts]
+normalization-dashboard = "normalization_dashboard:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
