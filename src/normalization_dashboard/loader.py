@@ -8,7 +8,23 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-DEFAULT_MIRROR = Path("data/kgx-storage.ci.transltr.io")
+MIRROR_NAME = Path("data/kgx-storage.ci.transltr.io")
+
+
+def _default_mirror():
+    """Find the mirror whether or not we were started from the repo root.
+
+    An IDE run configuration or a `uv run --project` from elsewhere sets a
+    different working directory, which used to load zero rows in silence.
+    """
+    from_repo = Path(__file__).parents[2] / MIRROR_NAME  # src/<pkg>/loader.py -> repo
+    return next(
+        (path for path in (MIRROR_NAME, from_repo) if path.is_dir()),
+        from_repo if from_repo.parent.parent.is_dir() else MIRROR_NAME,
+    )
+
+
+DEFAULT_MIRROR = _default_mirror()
 
 # The mirror directory is named after the host, so the remote URL of any mirrored
 # file is the host plus its path under the mirror root.
@@ -30,6 +46,11 @@ def load_rows(mirror=DEFAULT_MIRROR):
     prefixes case-insensitively, so ENSEMBL and Ensembl are the same prefix.
     """
     mirror = Path(mirror)
+    if not mirror.is_dir():
+        raise FileNotFoundError(
+            f"No KGX Storage mirror at {mirror.resolve()} -- run "
+            "./scripts/sync-kgx-normalization.sh from the repository root first."
+        )
     rows = []
     for metadata_path in sorted(mirror.glob("*/*/*/*/normalization-metadata.json")):
         source, source_version, transform, normalization = metadata_path.relative_to(
