@@ -61,6 +61,8 @@ allows several to coexist and the sync handles that without changes.
 - `normalization-metadata.json` — pre/post node counts, failure count, edge counts, and
   `normalization_by_prefix`: per source prefix `{succeeded, failed, total, success_rate,
   normalized_to: {target_prefix: count}}`. This is the input for goal 1. Tiny (~2–7 KB each).
+  Note its `success_rate` is **truncated, not rounded** (99.556 → 99.55; 128 of 587 rows differ),
+  so `loader.py` recomputes the rate from the counts instead of reading that field.
 - `normalization_failures.txt` — one unnormalized source CURIE per line. Input for goal 2. Not
   present in every build (e.g. ctkp, dakp have none).
 - `normalization_map.json` — `{"normalization_map": {"<source CURIE>": ["<normalized CURIE>"] | null}}`.
@@ -76,6 +78,29 @@ allows several to coexist and the sync handles that without changes.
 | `normalization-metadata.json` | 90 | 0.2 MB |
 | `normalization_failures.txt` | 87 | 56 MB |
 | `normalization_map.json` | 90 | 914 MB |
+
+### CURIE prefix case
+
+NodeNorm resolves CURIE prefixes case-insensitively — `ENSEMBL:ENSG00000139618`, `Ensembl:…` and
+`ensembl:…` all return `NCBIGene:675`. So anything that summarizes must pool prefixes
+case-insensitively (`loader.py` carries `prefix_key = prefix.upper()`), while individual records
+keep the case as observed in the files. In the current mirror this merges 86 observed source
+prefixes into 84: `Ensembl`/`ENSEMBL` and `SIGNOR`/`signor`. Both collisions happen to be across
+different sources, so per-source rows never show two spellings today — the folding matters for
+cross-source rollups.
+
+## The app
+
+- `src/normalization_dashboard/loader.py` — no Dash imports, returns plain `list[dict]` so a
+  notebook, the Dash app and a future static-JSON exporter can all reuse it. `load_rows()` gives one
+  row per (build, prefix); `summarize()` pools by (source, case-insensitive prefix).
+- `src/normalization_dashboard/app.py` — the Dash app. `uv run normalization-dashboard`.
+- `tests/test_loader.py` — invariant checks against the real mirror, no framework.
+  `uv run python tests/test_loader.py`. Skips cleanly if the mirror is not synced.
+
+Current shape of the data through the loader: 587 raw rows, 31 sources, 84 case-insensitive
+prefixes, 242 summary rows (241 for latest builds only — historical builds add almost nothing at the
+(source, prefix) level).
 
 ## Local mirror
 

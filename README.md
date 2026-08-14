@@ -35,8 +35,27 @@ the prefix-summary and normalization-failure reports.
 **Known upstream issue:** ubergraph's 247 MB `normalization_map.json` returns 502 from KGX Storage
 and cannot be downloaded, so a full sync exits non-zero. See [CLAUDE.md](CLAUDE.md) for details.
 
+## Running the dashboard
+
+```bash
+uv run normalization-dashboard     # http://127.0.0.1:8050
+```
+
+A local [Dash](https://plotly.com/dash/) app. The first view is every data source × CURIE prefix,
+sorted from the worst normalization rate to the best — the ranking that says which prefixes Babel
+should ingest next. Sort by **Failed** instead to rank by how many CURIEs are actually at stake: a
+prefix at 0% of 3 CURIEs and one at 0% of 216,000 sort identically by percentage.
+
+Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE prefixes case-insensitively
+(`ENSEMBL:`, `Ensembl:` and `ensembl:` all resolve alike); the spellings actually seen in the files
+are shown in the "Observed as" column.
+
+It runs locally, which keeps individual CURIEs off the public web and leaves the deployment question
+(GitHub Pages export, Kubernetes, or folding into another Translator dashboard) open.
+
 ## Development
 
 ```bash
 uv sync
+uv run python tests/test_loader.py
 ```
