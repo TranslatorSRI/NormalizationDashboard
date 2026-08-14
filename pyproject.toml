@@ -7,7 +7,9 @@ authors = [
     { name = "Gaurav Vaidya", email = "gaurav@renci.org" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "dash>=4.4.1",
+]
 
 [project.scripts]
 normalization-dashboard = "normalization_dashboard:main"
