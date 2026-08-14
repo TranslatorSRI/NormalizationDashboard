@@ -69,6 +69,41 @@ allows several to coexist and the sync handles that without changes.
   Failures are the `null` entries, so `normalization_failures.txt` is a subset of this file's keys.
   Kept anyway because it's 16× smaller and directly answers goal 2. The map is what goal 3 needs.
 
+### Node files — labels and Biolink types, not mirrored (yet)
+
+Two files we deliberately do **not** download, recorded here as sources of label/type information
+for when a report needs it. Both are large; check the size before pulling any of them.
+
+**`normalization_{...}/normalized_nodes.jsonl`** — post-normalization. One JSON object per line with
+the preferred CURIE, the full Biolink category ancestor list, the label, the clique members, and an
+information content score:
+
+```json
+{"id": "CHEBI:165710", "category": ["biolink:SmallMolecule", "...", "biolink:NamedThing"],
+ "name": "Palmitoleyl linoleate",
+ "equivalent_identifiers": ["CHEBI:165710", "PUBCHEM.COMPOUND:56935947", "INCHIKEY:NBQ..."],
+ "information_content": 100.0, "description": "..."}
+```
+
+This is what would let a summary report say *what* a normalized node is, not just that it
+normalized. Ubergraph's alone is 384 MB.
+
+**`transform_{hash}/{source}_nodes.jsonl`** — the transform output, generated *before*
+normalization. This is the one that says what the upstream source knew about a CURIE we could
+**not** normalize, which is exactly the missing half of the unnormalized-CURIE report. How much it
+knows varies sharply by source, so check before relying on it:
+
+| source | first line |
+|---|---|
+| pathbank (305 MB) | `{"id":"SMPDB:SMP0000055","category":["biolink:Pathway"],"name":"Alanine Metabolism","description":"Alanine (L-Alanine) is an α-amino acid…"}` |
+| ncbi_gene (74 MB) | `{"id":"NCBIGene:1","category":["biolink:Gene"],"name":"A1BG","description":"alpha-1-B glycoprotein","full_name":…,"taxon":"NCBITaxon:9606","symbol":"A1BG"}` |
+| goa (15 MB) | `{"name":"NUDT4B","id":"UniProtKB:A0A024RBG1","category":["biolink:Protein"],"description":"Diphosphoinositol polyphosphate phosphohydrolase NUDT4B","in_taxon":["NCBITaxon:9606"]}` |
+| ubergraph (49 MB) | `{"id":"CHEBI:165710","category":["biolink:NamedThing"]}` — **no label, no real type** |
+
+So for pathbank — currently the worst source, 215,953 unnormalized PathBank/SMPDB CURIEs — the
+transform output has names and descriptions and would make a genuinely actionable Babel ingest
+report. For ubergraph it would add nothing; those labels live in the ontologies themselves.
+
 ### Scale (full crawl of `data/`, Aug 2026)
 
 90 normalization directories; a full listing crawl takes ~40s.

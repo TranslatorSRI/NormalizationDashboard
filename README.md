@@ -17,6 +17,7 @@ files. The sync script mirrors *only* the three normalization files, preserving 
 layout, and deletes local files that have disappeared upstream.
 
 ```bash
+
 brew install rclone            # or apt install rclone
 ./scripts/sync-kgx-normalization.sh
 ```
