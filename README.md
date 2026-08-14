@@ -52,6 +52,10 @@ Prefixes are pooled case-insensitively, because NodeNorm resolves CURIE prefixes
 are shown in the "Observed as" column. Prefixes that fully normalize are hidden by default, and each
 version links back to the normalization output directory in KGX Storage that the numbers came from.
 
+Each row carries up to five **Example** CURIEs that actually failed to normalize, spelled and cased
+as the source spells them — often the fastest explanation of a 0% row. PathBank's failures turn out
+to be `PathBank:Reaction_13124` and `PathBank:Compound_102409`, not pathway identifiers at all.
+
 **Click a row** to list the CURIEs that failed to normalize for that source and prefix. Each links
 out — via the Biolink prefix map, falling back to [Bioregistry](https://bioregistry.io/) — so you can
 check what the identifier actually is. CURIEs that are malformed are flagged with the reason instead

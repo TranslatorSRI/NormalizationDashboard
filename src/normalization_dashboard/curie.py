@@ -49,9 +49,14 @@ def url(curie):
     return uri_stem + local_id if uri_stem else BIOREGISTRY_URL.format(curie)
 
 
-def as_markdown(curie):
-    """A table cell for one CURIE: a link, or the reason it is not linkable."""
+def as_markdown(curie, explain=False):
+    """One CURIE, monospaced so its exact characters are visible, linked if it can be.
+
+    Monospacing matters here: it is how `UniProtKB:B3DHD6 Q6XCC7` reads as one
+    broken string rather than as ordinary prose. `explain` adds why a CURIE is
+    not linkable, which is too wide for a table cell but wanted in the listing.
+    """
     link = url(curie)
     if link:
-        return f"[{curie}]({link})"
-    return f"`{curie}` ⚠ {malformed(curie)}"
+        return f"[`{curie}`]({link})"
+    return f"`{curie}`" + (f" ⚠ {malformed(curie)}" if explain else " ⚠")

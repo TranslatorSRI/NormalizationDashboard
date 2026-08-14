@@ -32,11 +32,42 @@ KGX_STORAGE_URL = "https://kgx-storage.ci.transltr.io/data"
 
 
 def _normalized_to_str(normalized_to):
-    """'NCBIGene 91678; UniProtKB 82176; PR 79548', biggest target first."""
+    """'NCBIGene (91678); UniProtKB (82176)', biggest target first.
+
+    The count is bracketed so a prefix and its count cannot be misread as a
+    CURIE: 'CHEBI 5' looked like a malformed one.
+    """
     return "; ".join(
-        f"{prefix} {count}"
+        f"{prefix} ({count})"
         for prefix, count in sorted(normalized_to.items(), key=lambda kv: -kv[1])
     )
+
+
+def load_failure_examples(rows, limit=5):
+    """A few real unnormalized CURIEs per (source, uppercased prefix).
+
+    One pass per failures file rather than per row -- 87 files, 3.2M lines, under
+    a second. CURIEs keep the case the file spells them with, which is half the
+    point: seeing `Ensembl:ENSRNOG…` or `PathBank:Reaction_13124` says more about
+    why a prefix fails than the folded prefix name does.
+    """
+    paths = {}
+    for row in rows:
+        if row["failures_path"]:
+            paths.setdefault(row["failures_path"], (row["source"], row["is_latest"]))
+
+    examples = defaultdict(list)
+    # Latest builds first, so examples come from current data where there is any.
+    for path, (source, _) in sorted(paths.items(), key=lambda item: not item[1][1]):
+        with open(path) as failures:
+            for line in failures:
+                curie = line.strip()
+                if not curie:
+                    continue
+                found = examples[(source, curie.split(":")[0].upper())]
+                if len(found) < limit and curie not in found:
+                    found.append(curie)
+    return examples
 
 
 def load_rows(mirror=DEFAULT_MIRROR):

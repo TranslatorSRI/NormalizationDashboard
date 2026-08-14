@@ -5,7 +5,9 @@ import os
 from dash import Dash, Input, Output, callback, dash_table, dcc, html
 
 from normalization_dashboard import curie
-from normalization_dashboard.loader import load_rows, summarize
+from normalization_dashboard.loader import load_failure_examples, load_rows, summarize
+
+EXAMPLE_COUNT = 5
 
 # (key, header, markdown?) -- CURIE Prefix leads, it is the row's subject.
 COLUMNS = [
@@ -17,6 +19,7 @@ COLUMNS = [
     ("succeeded", "Succeeded", False),
     ("failed", "Failed", False),
     ("success_rate", "Success %", False),
+    *[(f"example_{n}", f"Example {n}", True) for n in range(1, EXAMPLE_COUNT + 1)],
     ("normalized_to_str", "Normalized to", False),
 ]
 
@@ -50,6 +53,7 @@ MAX_CURIES_SHOWN = 300
 
 app = Dash(__name__)
 ROWS = load_rows()
+EXAMPLES = load_failure_examples(ROWS, limit=EXAMPLE_COUNT)
 
 
 def table_rows(latest_only, hide_complete):
@@ -57,6 +61,11 @@ def table_rows(latest_only, hide_complete):
     summary = summarize(rows)
     if hide_complete:
         summary = [row for row in summary if row["success_rate"] < 100]
+    for row in summary:
+        examples = EXAMPLES.get((row["source"], row["prefix"]), ())
+        for number in range(1, EXAMPLE_COUNT + 1):
+            example = examples[number - 1] if number <= len(examples) else None
+            row[f"example_{number}"] = curie.as_markdown(example) if example else ""
     return summary
 
 
@@ -84,6 +93,8 @@ app.layout = html.Div(
                 for key, name, md in COLUMNS
             ],
             markdown_options={"link_target": "_blank"},
+            # 14 columns: let the table scroll rather than crush every cell.
+            style_table={"overflowX": "auto"},
             sort_action="native",
             filter_action="native",
             page_size=75,
@@ -190,7 +201,7 @@ def show_failures(active_cell, data, latest_only):
         if malformed
         else None,
         dcc.Markdown(
-            " · ".join(curie.as_markdown(c) for c in shown),
+            " · ".join(curie.as_markdown(c, explain=True) for c in shown),
             link_target="_blank",
             style={"lineHeight": "2"},
         ),

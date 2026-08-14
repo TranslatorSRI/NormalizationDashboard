@@ -35,9 +35,12 @@ def main():
     ):
         assert curie.malformed(value) == reason, f"{value}: {curie.malformed(value)}"
         assert curie.url(value) is None, value
-        assert reason in curie.as_markdown(value)
+        assert reason in curie.as_markdown(value, explain=True)
+        # A table cell gets the warning sign but not the wide explanation.
+        assert curie.as_markdown(value) == f"`{value}` ⚠"
 
-    assert curie.as_markdown("MONDO:0001034").startswith("[MONDO:0001034](")
+    # Linked, and monospaced so the exact characters of a CURIE are visible.
+    assert curie.as_markdown("MONDO:0001034").startswith("[`MONDO:0001034`](")
 
     print(f"OK: {len(curie.PREFIX_MAP)} Biolink prefixes loaded")
     return 0
